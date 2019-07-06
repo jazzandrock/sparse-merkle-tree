@@ -1,0 +1,11 @@
+[package]
+name = "hello"
+version = "0.1.0"
+authors = ["Oleg Syniakevych <olegsyniakevych@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+sha2 = "0.8.0"
+hex-literal = "0.2.0"
+hex = "0.3.1"
+generic-array = "0.13.1"
