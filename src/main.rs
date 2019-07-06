@@ -4,6 +4,7 @@ use std::vec::Vec;
 
 mod merkle;
 use merkle::MerkleTree;
+use merkle::utils::log2_64;
 
 fn main() {
     println!("{:x?}", b"asd");
@@ -20,5 +21,14 @@ fn main() {
         b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
     ")[..]);
 
-    let a = MerkleTree::new(10);
+    let mut a = MerkleTree::new(4);
+
+    for i in 0..5 {
+        println!("saved {}", i);
+        a.append(b"asdf");
+        println!("###########################");
+    }
+    // for i in 0..60 {
+    //     println!("{}: {}", 1u64 << i, log2_64(1u64 << i));
+    // }
 }
