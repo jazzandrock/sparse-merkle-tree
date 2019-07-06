@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::vec::Vec;
+use hex::encode;
 
 use super::merkle_tree::{IndexT};
 
@@ -19,9 +20,9 @@ impl LocalKeyValueStore {
         }
     }
 
-    fn show_all(&self) {
+    pub fn show_all(&self) {
         for (k, v) in self.map.iter() {
-            println!("{}: {:x?}", k, v);
+            println!("{}: {:x?}", k, encode(v));
         }
     }
 }

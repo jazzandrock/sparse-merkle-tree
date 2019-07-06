@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use super::utils::log2_64;
 use super::storage::{LocalKeyValueStore, KeyValueStore};
 use super::hash_ren::HashConvenient;
+use hex::encode;
 
 pub type IndexT = usize;
 pub type SizeT = usize;
@@ -97,8 +98,37 @@ impl MerkleTree {
         };
     }
 
+    pub fn prove(&mut self, mut n: IndexT, data: &[u8]) -> bool {
+        let mut hash = HashConvenient::hash_bytes(&mut self.hasher, data);
+
+        while n > 1 {
+            let sibling = self.store.get(n ^ 1);
+
+            if n & 1 == 0 {
+                self.hasher.input(sibling);
+                self.hasher.input(hash.bytes_borrow());
+            } else {
+                self.hasher.input(hash.bytes_borrow());
+                self.hasher.input(sibling);
+            }
+
+            hash = HashConvenient::new(self.hasher.result_reset());
+
+            n >>= 1;
+
+            println!("n: {}", n);
+            println!("prov hash: {}", hash.to_string());
+            println!("real hash: {}", encode(self.store.get(n)));
+        }
+
+        println!("prov hash: {}", hash.to_string());
+        println!("real hash: {}", encode(self.store.get(1)));
+
+        encode(self.store.get(1)) == hash.to_string()
+    }
+
     /// appends a piece of data you want everybody to remember
-    pub fn append(& mut self, data: &[u8]) -> IndexT {
+    pub fn append(&mut self, data: &[u8]) -> IndexT {
         let mut curr_hash = HashConvenient::hash_bytes(&mut self.hasher, data);
 
         for (i, e) in self.hash_cache.iter_mut().enumerate() {
@@ -146,6 +176,20 @@ impl MerkleTree {
 
         let ret = self.curr;
         self.curr += 1;
+
+        println!("self.curr: {}", self.curr);
+        if self.curr == (1 as IndexT) << self.height {
+            // this is the last element in our tree, we can't insert anymore
+            println!("we are dumping our cache, it's over");
+            for e in self.hash_cache.iter() {
+                e.persistent_save(&mut self.store);
+            }
+        }
+
         ret
+    }
+
+    pub fn show_all(&self) {
+        self.store.show_all()
     }
 }
