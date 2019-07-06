@@ -1,7 +1,8 @@
 use sha2::{Sha256, Digest};
 use std::clone::Clone;
+use std::collections::HashMap;
 use super::utils::log2_64;
-
+use super::storage::{LocalKeyValueStore, KeyValueStore};
 use super::hash_ren::HashConvenient;
 
 pub type IndexT = usize;
@@ -29,7 +30,8 @@ impl TreeNode {
         }
     }
 
-    fn persistent_save(&self) {
+    fn persistent_save(&self, store: &mut KeyValueStore) {
+        store.put(self.index, self.hash.bytes_borrow());
         println!("persistently saved node {}, {}", self.index, self.hash.to_string());
     }
 }
@@ -40,7 +42,8 @@ pub struct MerkleTree {
     hasher: Sha256,
     empty_hashes: Vec<HashConvenient>,
     hash_cache: Vec<TreeNode>,
-    sibling_cache: Vec<TreeNode>
+    sibling_cache: Vec<TreeNode>,
+    store: LocalKeyValueStore
 }
 
 impl MerkleTree {
@@ -89,7 +92,8 @@ impl MerkleTree {
             hasher: hasher,
             empty_hashes: empty_hashes,
             hash_cache: hash_cache,
-            sibling_cache: sibling_cache
+            sibling_cache: sibling_cache,
+            store: LocalKeyValueStore::new()
         };
     }
 
@@ -107,38 +111,36 @@ impl MerkleTree {
                     index: n,
                     hash: curr_hash.clone()
                 };
-            } else {
-                if n & 1 == 0 {
-                    if e.index != n {
-                        e.persistent_save();
-                        self.sibling_cache[i] = e.clone();
-                    }
-
-                    *e = TreeNode{
-                        index: n,
-                        hash: curr_hash.clone()
-                    };
-
-                    let sibling_hash = &self.empty_hashes[i];
-                    self.hasher.input(curr_hash.bytes_borrow());
-                    self.hasher.input(sibling_hash.bytes_borrow());
-                    curr_hash = HashConvenient::new(self.hasher.result_reset());
-                } else {
-                    if e.index != n {
-                        e.persistent_save();
-                        self.sibling_cache[i] = e.clone();
-                    }
-
-                    *e = TreeNode{
-                        index: n,
-                        hash: curr_hash.clone()
-                    };
-                    
-                    let sibling_hash = &self.sibling_cache[i].hash;
-                    self.hasher.input(curr_hash.bytes_borrow());
-                    self.hasher.input(sibling_hash.bytes_borrow());
-                    curr_hash = HashConvenient::new(self.hasher.result_reset());
+            } else if n & 1 == 0 {
+                if e.index != n {
+                    e.persistent_save(&mut self.store);
+                    self.sibling_cache[i] = e.clone();
                 }
+
+                *e = TreeNode{
+                    index: n,
+                    hash: curr_hash.clone()
+                };
+
+                let sibling_hash = &self.empty_hashes[i];
+                self.hasher.input(curr_hash.bytes_borrow());
+                self.hasher.input(sibling_hash.bytes_borrow());
+                curr_hash = HashConvenient::new(self.hasher.result_reset());
+            } else {
+                if e.index != n {
+                    e.persistent_save(&mut self.store);
+                    self.sibling_cache[i] = e.clone();
+                }
+
+                *e = TreeNode{
+                    index: n,
+                    hash: curr_hash.clone()
+                };
+                
+                let sibling_hash = &self.sibling_cache[i].hash;
+                self.hasher.input(curr_hash.bytes_borrow());
+                self.hasher.input(sibling_hash.bytes_borrow());
+                curr_hash = HashConvenient::new(self.hasher.result_reset());
             }
         }
 

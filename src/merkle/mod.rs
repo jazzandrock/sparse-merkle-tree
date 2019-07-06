@@ -1,4 +1,5 @@
 mod hash_ren;
+mod storage;
 pub mod utils;
 
 mod merkle_tree;
