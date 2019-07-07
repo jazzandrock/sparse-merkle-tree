@@ -1,35 +1,13 @@
-use sha2::{Sha256, Digest};
-use hex_literal::hex;
-use std::vec::Vec;
-
 mod merkle;
 use merkle::MerkleTree;
-use merkle::utils::log2_64;
 
 fn main() {
-    println!("{:x?}", b"asd");
-    println!("Hello, world!");
-    let mut hasher: Sha256 = Sha256::new(); 
+    // create a tree with height=4
+    // it can contain up to 8 records
+    let mut tree = MerkleTree::new(4);
 
-    // write input message
-    hasher.input(b"hello world");
-
-    let result = hasher.result();
-
-    // read hash digest and consume hasher
-    assert_eq!(result[..], hex!("
-        b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
-    ")[..]);
-
-    let mut a = MerkleTree::new(4);
-
-    // for i in 0..8 {
-    //     println!("saved {}", i);
-    //     a.append(b"asdf");
-    //     println!("###########################");
-    // }
-
-    let business_transactions = vec![
+    // these are the records we will store
+    let business_transactions_orig = vec![
         "Alice pays Bob 17$",
         "Lublubah pays Alice 67$",
         "Bob pays Aania 100$",
@@ -40,22 +18,21 @@ fn main() {
         "Alice pays Aania 12$",
     ];
 
+    let business_transactions = &business_transactions_orig[..5];
+
     for t in business_transactions.iter() {
-        let n = a.append(t.as_bytes());
+        let _key = tree.append(t.as_bytes());
     }
 
+    // this is now optional
+    tree.save_state();
 
+    // let's see if proofs work correctly
     for (i, t) in business_transactions.iter().enumerate() {
         println!("proving {} {}", i, t);
-        for j in 0..8 {
-            let res = a.prove(j + 8, t.as_bytes());
+        for j in 0..business_transactions.len() {
+            let res = tree.prove(j, t.as_bytes());
             assert!(res == (i == j));
         }
     }
-    
-
-    a.show_all();
-    // for i in 0..60 {
-    //     println!("{}: {}", 1u64 << i, log2_64(1u64 << i));
-    // }
 }

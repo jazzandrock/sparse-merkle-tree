@@ -1,8 +1,8 @@
+use std::clone::Clone;
+use hex;
 use sha2::{Sha256, Digest};
 use sha2::digest::FixedOutput;
 use sha2::digest::generic_array::GenericArray;
-use hex::encode;
-use std::clone::Clone;
 
 const HASH_SIZE: usize = 32;
 type Hash = GenericArray<u8, <sha2::Sha256 as FixedOutput>::OutputSize>;
@@ -28,12 +28,25 @@ impl HashConvenient {
         HashConvenient::new(hasher.result_reset())
     }
 
+    pub fn hash_two_inputs(hasher: &mut Sha256, first: &[u8], second: &[u8]) -> HashConvenient {
+        hasher.input(first);
+        hasher.input(second);
+        HashConvenient::new(hasher.result_reset())
+    }
+
+    #[allow(dead_code)]
+    pub fn hash_from_hashes(hasher: &mut Sha256, first: String, second: String) -> HashConvenient {
+        let first_dec = hex::decode(first).unwrap();
+        let second_dec = hex::decode(second).unwrap();
+        HashConvenient::hash_two_inputs(hasher, first_dec.as_slice(), second_dec.as_slice())
+    }
+
     pub fn bytes_borrow(&self) -> &[u8] {
         &self.hash
     }
 
     pub fn to_string(&self) -> String {
-        encode(self.bytes_borrow())
+        hex::encode(self.bytes_borrow())
     }
 }
 

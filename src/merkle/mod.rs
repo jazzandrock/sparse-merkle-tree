@@ -1,4 +1,4 @@
-mod hash_ren;
+pub mod hash_convenient;
 mod storage;
 pub mod utils;
 
