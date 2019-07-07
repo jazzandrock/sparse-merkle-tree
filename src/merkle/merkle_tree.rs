@@ -15,7 +15,8 @@ pub struct MerkleTree {
     empty_hashes: Vec<HashConvenient>,
     hash_cache: Vec<TreeNode>,
     sibling_cache: Vec<TreeNode>,
-    store: LocalKeyValueStore
+    store: LocalKeyValueStore,
+    values: Vec<Vec<u8>>
 }
 
 impl MerkleTree {
@@ -56,7 +57,8 @@ impl MerkleTree {
             empty_hashes: empty_hashes,
             hash_cache: hash_cache,
             sibling_cache: sibling_cache,
-            store: LocalKeyValueStore::new()
+            store: LocalKeyValueStore::new(),
+            values: Vec::<Vec<u8>>::new()
         };
         tree
     }
@@ -86,6 +88,28 @@ impl MerkleTree {
         is_proved
     }
 
+    fn intermediary_hashes(&mut self, idx: IndexT) -> Vec<Vec<u8>> {
+        let mut res = Vec::<Vec<u8>>::new();
+
+        let mut n = idx + first_node_idx(self.height);
+        while n > 1 {
+            res.push(self.get_node(n ^ 1));
+            n >>= 1;
+        }
+
+        res.push(self.get_node(n));
+        
+        res
+    }
+
+    pub fn get_value(&mut self, idx: IndexT) -> (Vec<u8>, IndexT, Vec<Vec<u8>>) {
+        let val = self.values[idx as usize].to_vec();
+        let hashes = self.intermediary_hashes(idx);
+        let n = idx + first_node_idx(self.height);
+
+        (val, n, hashes)
+    }
+
     pub fn root_hash_for_idx_and_data(&mut self, idx: IndexT, data: &[u8]) -> String {
         let mut hash = HashConvenient::hash_bytes(&mut self.hasher, data);
 
@@ -104,6 +128,7 @@ impl MerkleTree {
         }
 
         let computed_root = hash.to_string();
+
         computed_root
     }
 
@@ -153,6 +178,8 @@ impl MerkleTree {
             index: n,
             hash: curr_hash.clone()
         };
+
+        self.values.push(data.to_vec());
 
         let tree_key = self.curr - first_node_idx(self.height);
         self.curr += 1;

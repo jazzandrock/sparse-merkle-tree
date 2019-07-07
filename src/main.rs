@@ -1,5 +1,7 @@
+use sha2::Sha256;
 mod merkle;
-use merkle::MerkleTree;
+use merkle::{MerkleTree, IndexT};
+use merkle::utils::is_correct;
 
 fn main() {
     // create a tree with height=4
@@ -34,5 +36,14 @@ fn main() {
             let res = tree.prove(j, t.as_bytes());
             assert!(res == (i == j));
         }
+    }
+
+    // proofs as they should be
+    let mut hasher = Sha256::default();
+    let incorrect_value = b"i'm incorrect ajajaja".to_vec();
+    for i in 0..business_transactions.len() as IndexT {
+        let (val, n, hashes) = tree.get_value(i);
+        assert!(is_correct(&mut hasher, &val, n, &hashes));
+        assert!( ! is_correct(&mut hasher, &incorrect_value, n, &hashes));
     }
 }

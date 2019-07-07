@@ -1,3 +1,29 @@
+use sha2::Sha256;
+use super::hash_convenient::HashConvenient;
+use super::merkle_tree::IndexT;
+
+fn hash_from_sibling_in_order(hasher: &mut Sha256, data: &[u8], sibling: &[u8], n: IndexT) -> HashConvenient {
+    if n & 1 == 0 {
+        HashConvenient::hash_two_inputs(hasher, data, sibling)
+    } else {
+        HashConvenient::hash_two_inputs(hasher, sibling, data)
+    }
+}
+
+pub fn is_correct(hasher: &mut Sha256, data: &Vec<u8>, mut n: IndexT, hashes: &Vec<Vec<u8>>) -> bool {
+    let mut hash = HashConvenient::hash_bytes(hasher, &data);
+
+    for sibling in hashes[..hashes.len() - 1].iter() {
+        hash = hash_from_sibling_in_order(hasher, 
+            hash.bytes_borrow(), sibling, n);
+
+        n >>= 1;
+    }
+
+    let correct = hash.bytes_borrow() == &hashes.last().unwrap()[..];
+    correct
+}
+
 #[allow(dead_code)]
 pub fn log2_64(mut value: u64) -> usize {
     static TAB64: [usize; 64] = [
