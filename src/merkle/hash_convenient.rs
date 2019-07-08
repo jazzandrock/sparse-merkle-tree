@@ -3,6 +3,7 @@ use hex;
 use sha2::{Sha256, Digest};
 use sha2::digest::FixedOutput;
 use sha2::digest::generic_array::GenericArray;
+use super::{IndexT};
 
 const HASH_SIZE: usize = 32;
 type Hash = GenericArray<u8, <sha2::Sha256 as FixedOutput>::OutputSize>;
@@ -47,6 +48,14 @@ impl HashConvenient {
 
     pub fn to_string(&self) -> String {
         hex::encode(self.bytes_borrow())
+    }
+
+    pub fn hash_from_sibling_in_order(hasher: &mut Sha256, data: &[u8], sibling: &[u8], n: IndexT) -> HashConvenient {
+        if n & 1 == 0 {
+            HashConvenient::hash_two_inputs(hasher, data, sibling)
+        } else {
+            HashConvenient::hash_two_inputs(hasher, sibling, data)
+        }
     }
 }
 

@@ -1,5 +1,4 @@
 use std::clone::Clone;
-use hex;
 use sha2::Sha256;
 use super::storage::{LocalKeyValueStore, KeyValueStore};
 use super::hash_convenient::HashConvenient;
@@ -20,6 +19,7 @@ pub struct MerkleTree {
 }
 
 impl MerkleTree {
+    /// initialize empty tree.
     pub fn new(height: i32) -> Self {
         assert!(height > 1);
 
@@ -63,46 +63,19 @@ impl MerkleTree {
         tree
     }
 
-    fn get_node(&self, n: IndexT) -> Vec<u8> {
-        let log = log2_64(n as u64);
-        let idx = (self.height as usize) - log - 1;
+    /// get the root of the tree, needed for
+    /// a proof.
+    pub fn root(&mut self) -> Vec<u8> {
+        self.get_node(1)
+    }
 
-        if self.hash_cache[idx].index == n {
-            self.hash_cache[idx].hash.bytes_borrow().to_vec()
-        } else if let Some(val) = self.store.get(n) {
-            val.to_vec()
-        } else {
-            self.empty_hashes[idx].bytes_borrow().to_vec()
+    /// gives the value at an index
+    /// along with everything one needs
+    /// to verify it.
+    pub fn get_value_and_proof(&mut self, idx: IndexT) -> (Vec<u8>, IndexT, Vec<Vec<u8>>) {
+        if self.values.len() <= idx {
+            panic!(format!("there's no value at index {}", idx));
         }
-    }
-
-    pub fn root(&mut self) -> String {
-        hex::encode(self.get_node(1))
-    }
-
-    pub fn prove(&mut self, idx: IndexT, data: &[u8]) -> bool {
-        let computed_root = self.root_hash_for_idx_and_data(idx, data);
-        let actual_root = self.root();
-
-        let is_proved = *actual_root == *computed_root;
-        is_proved
-    }
-
-    fn intermediary_hashes(&mut self, idx: IndexT) -> Vec<Vec<u8>> {
-        let mut res = Vec::<Vec<u8>>::new();
-
-        let mut n = idx + first_node_idx(self.height);
-        while n > 1 {
-            res.push(self.get_node(n ^ 1));
-            n >>= 1;
-        }
-
-        res.push(self.get_node(n));
-        
-        res
-    }
-
-    pub fn get_value(&mut self, idx: IndexT) -> (Vec<u8>, IndexT, Vec<Vec<u8>>) {
         let val = self.values[idx as usize].to_vec();
         let hashes = self.intermediary_hashes(idx);
         let n = idx + first_node_idx(self.height);
@@ -110,31 +83,9 @@ impl MerkleTree {
         (val, n, hashes)
     }
 
-    pub fn root_hash_for_idx_and_data(&mut self, idx: IndexT, data: &[u8]) -> String {
-        let mut hash = HashConvenient::hash_bytes(&mut self.hasher, data);
-
-        let mut n = idx + first_node_idx(self.height);
-        while n > 1 {
-            let sibling_vec = self.get_node(n ^ 1);
-            let sibling = sibling_vec.as_slice();
-
-            hash = if n & 1 == 0 {
-                HashConvenient::hash_two_inputs(&mut self.hasher, hash.bytes_borrow(), sibling)
-            } else {
-                HashConvenient::hash_two_inputs(&mut self.hasher, sibling, hash.bytes_borrow())
-            };
-
-            n >>= 1;
-        }
-
-        let computed_root = hash.to_string();
-
-        computed_root
-    }
-
     /// appends a piece of data you want everybody to remember
     pub fn append(&mut self, data: &[u8]) -> IndexT {
-        assert!( ! self.is_empty());
+        assert!(self.capacity() > 0);
 
         let mut curr_hash = HashConvenient::hash_bytes(&mut self.hasher, data);
 
@@ -159,15 +110,9 @@ impl MerkleTree {
                 &self.sibling_cache[i].hash
             };
 
-            curr_hash = if n & 1 == 0 {
-                HashConvenient::hash_two_inputs(
+            curr_hash = HashConvenient::hash_from_sibling_in_order(
                 &mut self.hasher, curr_hash.bytes_borrow(), 
-                sibling_hash.bytes_borrow())
-            } else {
-                HashConvenient::hash_two_inputs(
-                &mut self.hasher, sibling_hash.bytes_borrow(),
-                curr_hash.bytes_borrow())
-            };
+                sibling_hash.bytes_borrow(), n);
 
             n >>= 1;
             i += 1;
@@ -184,15 +129,15 @@ impl MerkleTree {
         let tree_key = self.curr - first_node_idx(self.height);
         self.curr += 1;
 
-        // our tree has fixed size, so 
-        if self.is_empty() {
-            self.save_state();
-        }
-
         tree_key
     }
-
-    /// dumps all the internal state to the database.
+    
+    /// We only write a hash of a node to the database
+    /// when the hash of that node is final.
+    /// 
+    /// After you finish writing to 
+    /// the tree, you must call this method
+    /// to persist everything not yet saved to the database.
     pub fn save_state(&mut self) {
         for e in self.hash_cache.iter() {
             e.persistent_save(&mut self.store);
@@ -203,13 +148,34 @@ impl MerkleTree {
         ((1 as IndexT) << self.height) - self.curr
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.capacity() == 0
+    fn get_node(&self, n: IndexT) -> Vec<u8> {
+        let log = log2_64(n as u64);
+        let idx = (self.height as usize) - log - 1;
+
+        let node = if self.hash_cache[idx].index == n {
+            self.hash_cache[idx].hash.bytes_borrow().to_vec()
+        } else if let Some(val) = self.store.get(n) {
+            val.to_vec()
+        } else {
+            self.empty_hashes[idx].bytes_borrow().to_vec()
+        };
+
+        node
     }
 
-    #[allow(dead_code)]
-    pub fn show_all(&self) {
-        self.store.show_all()
+    /// gives every needed node, except
+    /// the root - the verifier will have 
+    /// to get the root from third party anyway.
+    fn intermediary_hashes(&mut self, idx: IndexT) -> Vec<Vec<u8>> {
+        let mut res = Vec::<Vec<u8>>::new();
+
+        let mut n = idx + first_node_idx(self.height);
+        while n > 1 {
+            res.push(self.get_node(n ^ 1));
+            n >>= 1;
+        }
+        
+        res
     }
 }
 

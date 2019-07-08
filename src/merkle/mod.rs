@@ -1,6 +1,8 @@
-pub mod hash_convenient;
+mod hash_convenient;
 mod storage;
-pub mod utils;
+
+mod utils;
+pub use self::utils::check_proof;
 
 mod merkle_tree;
 pub use self::merkle_tree::{MerkleTree, IndexT};
