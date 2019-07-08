@@ -1,2 +1,2 @@
 mod merkle;
-pub use merkle::{MerkleTree, IndexT, check_proof};
+pub use merkle::{MerkleTree, IndexT, Proof};

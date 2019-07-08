@@ -72,7 +72,7 @@ impl MerkleTree {
     /// gives the value at an index
     /// along with everything one needs
     /// to verify it.
-    pub fn get_value_and_proof(&mut self, idx: IndexT) -> (Vec<u8>, IndexT, Vec<Vec<u8>>) {
+    pub fn get_value_and_proof(&mut self, idx: IndexT) -> (Vec<u8>, Proof) {
         if self.values.len() <= idx {
             panic!(format!("there's no value at index {}", idx));
         }
@@ -80,7 +80,12 @@ impl MerkleTree {
         let hashes = self.intermediary_hashes(idx);
         let n = idx + first_node_idx(self.height);
 
-        (val, n, hashes)
+        let proof = Proof {
+            n: n, 
+            hashes: hashes
+        };
+
+        (val, proof)
     }
 
     /// appends a piece of data you want everybody to remember
@@ -208,5 +213,31 @@ impl TreeNode {
     fn persistent_save(&self, store: &mut KeyValueStore) {
         store.put(self.index, self.hash.bytes_borrow());
         println!("persistently saved node {}, {}", self.index, self.hash.to_string());
+    }
+}
+
+pub struct Proof {
+    n: IndexT, 
+    hashes: Vec<Vec<u8>>
+}
+
+impl Proof {
+    /// a function you can use to know if 
+    /// MerkleTree::get_value_and_proof 
+    /// gave you indeed the data from the tree.
+    pub fn check(&self, hasher: &mut Sha256, data: &Vec<u8>,
+        root: &Vec<u8>) -> bool {
+        let mut hash = HashConvenient::hash_bytes(hasher, &data);
+
+        let mut n = self.n;
+        for sibling in self.hashes.iter() {
+            hash = HashConvenient::hash_from_sibling_in_order(
+                hasher, hash.bytes_borrow(), sibling, n);
+
+            n >>= 1;
+        }
+
+        let correct = hash.bytes_borrow() == &root[..];
+        correct
     }
 }

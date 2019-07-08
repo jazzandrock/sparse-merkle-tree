@@ -3,7 +3,7 @@ extern crate lazy_static;
 
 use sha2::Sha256;
 extern crate hello;
-use hello::{MerkleTree, check_proof, IndexT};
+use hello::{MerkleTree, IndexT};
 
 lazy_static! {
     static ref BUSINESS_TRANSACTIONS: Vec<&'static str> = {
@@ -40,12 +40,12 @@ fn fill_and_prove(tree: &mut MerkleTree, save_state: bool) {
     let root = tree.root();
     let incorrect_value = b"I'm incorrect lalala".to_vec();
     for i in 0..8 as IndexT {
-        let (data, idx, hashes) = tree.get_value_and_proof(i);  
+        let (data, proof) = tree.get_value_and_proof(i);  
         // it proves what is shoud
-        assert!(check_proof(&mut hasher, &data, idx, &hashes, &root));
+        assert!(proof.check(&mut hasher, &data, &root));
 
         // and doesn't prove what shouldn't
-        assert!( ! check_proof(&mut hasher, &incorrect_value, idx, &hashes, &root));
+        assert!( ! proof.check(&mut hasher, &incorrect_value, &root));
     }
 }
 
@@ -80,18 +80,5 @@ mod tests {
         let mut tree = MerkleTree::new(63);
 
         fill_and_prove(&mut tree, false);
-    }
-
-    #[test]
-    fn test_add() {
-        let mut hasher = Sha256::default();
-        let mut tree = MerkleTree::new(4);
-
-        for t in BUSINESS_TRANSACTIONS.iter() {
-            let _key = tree.append(t.as_bytes());
-            let (val, n, hashes) = tree.get_value_and_proof(_key);
-            let root = tree.root();
-            assert!(check_proof(&mut hasher, &val, n, &hashes, &root));
-        }
     }
 }

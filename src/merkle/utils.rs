@@ -1,26 +1,3 @@
-use sha2::Sha256;
-use super::hash_convenient::HashConvenient;
-use super::merkle_tree::IndexT;
-
-/// a function you can use to know if 
-/// MerkleTree::get_value_and_proof 
-/// gave you indeed the data from the tree.
-pub fn check_proof(hasher: &mut Sha256, data: &Vec<u8>, 
-    mut n: IndexT, hashes: &Vec<Vec<u8>>,
-    root: &Vec<u8>) -> bool {
-    let mut hash = HashConvenient::hash_bytes(hasher, &data);
-
-    for sibling in hashes.iter() {
-        hash = HashConvenient::hash_from_sibling_in_order(
-            hasher, hash.bytes_borrow(), sibling, n);
-
-        n >>= 1;
-    }
-
-    let correct = hash.bytes_borrow() == &root[..];
-    correct
-}
-
 pub fn log2_64(mut value: u64) -> usize {
     static TAB64: [usize; 64] = [
         0 , 58, 1 , 59, 47, 53, 2 , 60, 
